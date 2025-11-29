@@ -32,7 +32,9 @@ class action:
 
 class CommandItem(ABC):
     @abstractmethod
-    def add_to_parser(self, parser: ArgumentParser): pass
+    def add_to_parser(self, parser: ArgumentParser):
+        """Adds this item to the `parser: ArgumentParser`."""
+        pass
 
 class arg(CommandItem):
     __slots__ = ('name_or_flags', 'kwargs',)

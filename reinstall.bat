@@ -1,11 +1,10 @@
 @echo OFF
 :: Attempts to run command that requires elevated privileges.
-net session >nul 2>&1
+sudo run -E python -m pip install --force-reinstall "%~dp0\."
 if errorlevel 1 (
-    powershell -NoProfile -Command "Start-Process '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs -Wait"
-    exit /b
+    echo There was an error installing `cmdr`.
+    exit /b %errorlevel%
 )
-cd /d "%~dp0"
-python -m pip uninstall cmdr -y
-python -m pip install .
-pause
+if "%1"=="--wait" (
+    pause
+)
