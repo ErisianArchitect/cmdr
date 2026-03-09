@@ -5,7 +5,18 @@ from argparse import Namespace, ArgumentParser, Action
 from pathlib import Path
 from functools import wraps
 
-__all__ = ['action', 'arg', 'command', 'CommandItem', 'entry', 'flag', 'group', 'subcommand', 'subparser']
+__all__ = [
+    'action',
+    'arg',
+    'call_if',
+    'command',
+    'CommandItem',
+    'entry',
+    'flag',
+    'group',
+    'subcommand',
+    'subparser',
+]
 
 T = TypeVar('T')
 ArgumentParserT = TypeVar('ArgumentParserT')
@@ -18,17 +29,25 @@ def entry(target):
         target(sys.argv[1:])
     return target
 
+def call_if(condition: bool, *args, **kwargs):
+    """Calls the decorated function immediately if the condition evaluates to `True`."""
+    def deco(target):
+        if condition:
+            target(*args, **kwargs)
+        return target
+    return deco
+
 class action:
-    store='store'
-    store_const='store_const'
-    store_true='store_true'
-    store_false='store_false'
-    append='append'
-    append_const='append_const'
-    extend='extend'
-    count='count'
-    help='help'
-    version='version'
+    STORE='store'
+    STORE_CONST='store_const'
+    STORE_TRUE='store_true'
+    STORE_FALSE='store_false'
+    APPEND='append'
+    APPEND_CONST='append_const'
+    EXTEND='extend'
+    COUNT='count'
+    HELP='help'
+    VERSION='version'
 
 class CommandItem(ABC):
     @abstractmethod
@@ -66,7 +85,7 @@ class arg(CommandItem):
 @overload
 def flag(
     *name_or_flags: str,
-    action: str | type[Action] = action.store_true,
+    action: str | type[Action] = 'store_true',
     nargs: int | str | None = None,
     const: Any = ...,
     default: Any = ...,
@@ -160,7 +179,7 @@ class subcommand(CommandItem):
         self.parser_args.extend(args)
         return self
     
-    def subcommand(self, command: subcommand) -> Self:
+    def subcommand(self, command: subparser) -> Self:
         self.parser_subcommand = command
         return self
     
@@ -249,7 +268,29 @@ class command:
         add_help: bool = True,
         allow_abbrev: bool = True,
         exit_on_error: bool = True,
-    ): pass
+        *,
+        suggest_on_error: bool = False,
+        color: bool = True,
+    ):
+        """Create a `command` `argparse.ArgumentParser` wrapper.
+        
+        # Arguments
+        - `prog` - The name of the program (default: generated from the __main__ module attributes and sys.argv[0])
+        - `usage` - The string describing the program usage (default: generated from arguments added to parser)
+        - `description` - Text to display before the argument help (by default, no text)
+        - `epilog` - Text to display after the argument help (by default, no text)
+        - `parents` - A list of ArgumentParser objects whose arguments should also be included
+        - `formatter_class` - A class for customizing the help output
+        - `prefix_chars` - The set of characters that prefix optional arguments (default: `'-'`)
+        - `fromfile_prefix_chars` - The set of characters that prefix files from which additional arguments should be read (default: `None`)
+        - `argument_default` - The global default value for arguments (default: `None`)
+        - `conflict_handler` - The strategy for resolving conflicting optionals (usually unnecessary)
+        - `add_help` - Add a `-h/--help` option to the parser (default: `True`)
+        - `allow_abbrev` - Allows long options to be abbreviated if the abbreviation is unambiguous (default: `True`)
+        - `exit_on_error` - Determines whether or not ArgumentParser exits with error info when an error occurs. (default: True)
+        - `suggest_on_error` - Enables suggestions for mistyped argument choices and subparser names (default: `False`)
+        - `color` Allow color output (default `True`)
+        """
     def __init__(
         self,
         *args,
@@ -266,13 +307,14 @@ class command:
             arg.add_to_parser(self.parser)
         return self
     
-    def subcommand(self, subcommand: subcommand)->Self:
+    def subcommand(self, subcommand: subparser)->Self:
         subcommand.add_to_parser(self.parser)
         return self
     
+    # For usage as a decorator
     def __call__(self, target):
         @wraps(target)
-        def wrapped(args: Iterable[str]):
+        def wrapped(args: Sequence[str] = sys.argv[1:]):
             ns = self.parse(args)
             return target(ns)
         return wrapped
